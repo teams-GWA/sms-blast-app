@@ -602,6 +602,21 @@ input[type="file"]::file-selector-button{font-family:var(--sans);font-size:12px;
 </div>
 <div id="toast"></div>
 
+
+<div class="modal-overlay" id="delivery-alert-modal">
+  <div class="modal">
+    <div class="m-icon">⚠️</div>
+    <div class="m-title">Low Delivery Rate!</div>
+    <div class="m-sub" id="delivery-alert-msg">Delivery rate has dropped below 20%</div>
+    <div class="m-stats" style="grid-template-columns:1fr;">
+      <div class="mstat"><div class="mv r" id="delivery-alert-rate">0%</div><div class="ml">Current delivery rate</div></div>
+    </div>
+    <div class="m-actions">
+      <button class="m-export" onclick="resolveDeliveryAlert(false)">🛑 Stop blast</button>
+      <button class="m-close" onclick="resolveDeliveryAlert(true)">▶ Continue anyway</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="summary-modal">
   <div class="modal">
     <div class="m-icon" id="m-icon">✅</div>
@@ -862,8 +877,58 @@ async function executeBlast(camp){
       log('DNC list loaded: ' + dncSet.size.toLocaleString() + ' numbers', 'linfo');
     }
   } catch(e) { log('Could not load DNC list', 'lwarn'); }
+  let deliveryCheckCount = 0;
   log('Started: '+total.toLocaleString()+' contacts / '+camp.dids.length+' DIDs / '+concur+' concurrent','linfo');
-  for(let i=0;i<total;i+=concur){if(stopFlag){log('Stopped at '+i.toLocaleString(),'lwarn');break;}while(paused){await new Promise(r=>setTimeout(r,300));}await Promise.all(camp.contactData.slice(i,i+concur).map((c,j)=>sendOne(c,i+j)));updateLive(Math.min(i+concur,total));if(i>0&&i%10000===0)log(i.toLocaleString()+'/'+total.toLocaleString()+' sent='+sentCount.toLocaleString(),'lok');if(batchDelay>0)await new Promise(r=>setTimeout(r,batchDelay));}
+  for(let i=0;i<total;i+=concur){
+    if(stopFlag){log('Stopped at '+i.toLocaleString(),'lwarn');break;}
+    while(paused){await new Promise(r=>setTimeout(r,300));}
+    await Promise.all(camp.contactData.slice(i,i+concur).map((c,j)=>sendOne(c,i+j)));
+    updateLive(Math.min(i+concur,total));
+    if(i>0&&i%10000===0)log(i.toLocaleString()+'/'+total.toLocaleString()+' sent='+sentCount.toLocaleString(),'lok');
+    if(batchDelay>0)await new Promise(r=>setTimeout(r,batchDelay));
+    
+    // Check delivery rate every 5,000 messages
+    const totalSent = sentCount + failCount;
+    if(totalSent > 0 && totalSent - deliveryCheckCount >= 5000) {
+      deliveryCheckCount = totalSent;
+      log('⏸ Pausing 30s to check delivery rate...','linfo');
+      paused = true;
+      document.getElementById('pause-btn').innerHTML='&#9654; Resume';
+      
+      // Wait 30 seconds for DLRs to come back
+      await new Promise(r=>setTimeout(r,30000));
+      
+      // Check delivery rate from backend
+      try {
+        const bu = getBackendURL();
+        if(bu) {
+          const stats = await fetch(bu+'/api/stats').then(r=>r.json());
+          const deliveryRate = stats.total > 0 ? Math.round((stats.delivered/stats.total)*100) : 0;
+          log('📊 Delivery rate: '+deliveryRate+'% ('+stats.delivered.toLocaleString()+' delivered / '+stats.total.toLocaleString()+' sent)','linfo');
+          
+          if(deliveryRate < 20) {
+            log('⚠️ Delivery rate below 20%! Blast paused — please review.','lwarn');
+            // Show confirmation dialog
+            const continueBlast = await new Promise(resolve => {
+              showDeliveryAlert(deliveryRate, resolve);
+            });
+            if(!continueBlast) {
+              stopFlag = true;
+              log('🛑 Blast stopped due to low delivery rate','lerr');
+              break;
+            } else {
+              log('▶ Continuing blast...','lok');
+            }
+          } else {
+            log('✅ Delivery rate OK ('+deliveryRate+'%) — resuming...','lok');
+          }
+        }
+      } catch(e) { log('Could not check delivery rate: '+e.message,'lwarn'); }
+      
+      paused = false;
+      document.getElementById('pause-btn').innerHTML='&#9646;&#9646; Pause';
+    }
+  }
   camp.status=stopFlag?'Stopped':'Sent';camp.endTime=Date.now();sending=false;
   // Save campaign summary to backend
   const bu2=getBackendURL();if(bu2){fetch(bu2+'/api/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:camp.name,total:total,sent:sentCount,failed:failCount,msg:camp.msg})}).catch(()=>{});}
@@ -995,12 +1060,14 @@ function showMsgDetail(encoded) {
     const m = JSON.parse(decodeURIComponent(encoded));
     const segments = m.message ? Math.max(1, Math.ceil(m.message.length / 160)) : 1;
     const errorCodes = {
-      '600': 'Carrier rejected — number blocked or invalid',
-      '800': 'Filtered by carrier — spam detection',
+      '000': 'Delivered to handset',
+      '005': 'Delivered to carrier network',
       '100': 'Delivered successfully',
-      '000': 'Delivered successfully',
+      '200': 'Accepted by carrier',
       '400': 'Bad request — invalid number format',
-      '500': 'Server error'
+      '500': 'Server error',
+      '600': 'Carrier rejected — number blocked or invalid',
+      '800': 'Filtered by carrier — spam detection'
     };
 
     const statusColors = {
@@ -1144,6 +1211,24 @@ async function clearDNCList() {
   loadDNCList();
 }
 
+
+
+let deliveryAlertResolver = null;
+
+function showDeliveryAlert(rate, resolver) {
+  deliveryAlertResolver = resolver;
+  document.getElementById('delivery-alert-rate').textContent = rate + '%';
+  document.getElementById('delivery-alert-msg').textContent = 'Delivery rate dropped to ' + rate + '% after ' + sentCount.toLocaleString() + ' messages sent. Carriers may be filtering your messages.';
+  document.getElementById('delivery-alert-modal').classList.add('open');
+}
+
+function resolveDeliveryAlert(continueBlast) {
+  document.getElementById('delivery-alert-modal').classList.remove('open');
+  if(deliveryAlertResolver) {
+    deliveryAlertResolver(continueBlast);
+    deliveryAlertResolver = null;
+  }
+}
 
 // CARRIER SCRUBBER
 let scrubData = null;
