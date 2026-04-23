@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Rsbrm Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#0a0a0f;--surface:#111118;--surface2:#18181f;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--accent:#4ade80;--accent2:#22d3ee;--red:#f87171;--yellow:#fbbf24;--purple:#a78bfa;--text:#f0f0f5;--muted:#6b6b7a;--mono:"DM Mono",monospace;--sans:"DM Sans",sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;}
+.login{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+.login-box{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:36px 40px;width:360px;text-align:center;}
+.login-mark{font-family:var(--mono);font-size:11px;letter-spacing:0.15em;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
+.login-title{font-size:22px;font-weight:600;margin-bottom:4px;}
+.login-sub{font-size:13px;color:var(--muted);margin-bottom:24px;}
+.login-input{width:100%;padding:11px 14px;font-size:14px;font-family:var(--sans);background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);outline:none;text-align:center;letter-spacing:0.1em;margin-bottom:12px;}
+.login-input:focus{border-color:var(--accent2);}
+.login-err{font-size:11px;color:var(--red);font-family:var(--mono);margin-bottom:10px;display:none;}
+.btn-login{width:100%;padding:11px;font-size:14px;font-family:var(--sans);font-weight:600;border-radius:8px;cursor:pointer;background:var(--accent);color:#000;border:none;}
+.btn-login:hover{background:#22c55e;}
+.admin-shell{display:none;}
+.admin-header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 30px;display:flex;align-items:center;justify-content:space-between;}
+.admin-title{font-size:18px;font-weight:600;}
+.admin-sub{font-size:11px;color:var(--muted);font-family:var(--mono);}
+.admin-body{padding:24px 30px;max-width:1200px;}
+.account-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;}
+.account-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;}
+.account-name{font-size:16px;font-weight:600;margin-bottom:4px;}
+.account-url{font-size:11px;color:var(--accent2);font-family:var(--mono);margin-bottom:14px;}
+.stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.stat-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex:1;min-width:80px;}
+.stat-val{font-size:18px;font-weight:600;font-family:var(--mono);}
+.stat-val.g{color:var(--accent);}
+.stat-val.b{color:var(--accent2);}
+.stat-val.r{color:var(--red);}
+.stat-val.y{color:var(--yellow);}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-top:2px;}
+.btn{padding:7px 14px;font-size:12px;font-family:var(--sans);font-weight:500;border-radius:7px;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--text);transition:all 0.12s;text-decoration:none;display:inline-block;}
+.btn:hover{background:#222230;}
+.btn-g{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;}
+.btn-r{background:rgba(248,113,113,0.1);color:var(--red);border-color:rgba(248,113,113,0.25);}
+.section-title{font-size:14px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.camp-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.camp-row:last-child{border-bottom:none;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-family:var(--mono);}
+.bs{background:rgba(74,222,128,0.1);color:var(--accent);border:1px solid rgba(74,222,128,0.2);}
+.bi{background:rgba(34,211,238,0.1);color:var(--accent2);border:1px solid rgba(34,211,238,0.2);}
+.bw{background:rgba(251,191,36,0.1);color:var(--yellow);border:1px solid rgba(251,191,36,0.2);}
+.br{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.2);}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:16px;}
+#toast{display:none;position:fixed;bottom:22px;right:22px;padding:10px 16px;border-radius:8px;font-size:12px;font-family:var(--mono);z-index:9999;background:var(--surface);border:1px solid var(--border2);color:var(--text);}
+</style>
+</head>
+<body>
+
+<div class="login" id="login-screen">
+  <div class="login-box">
+    <div class="login-mark">RSBRM</div>
+    <div class="login-title">Admin Panel</div>
+    <div class="login-sub">Enter your admin password to continue</div>
+    <input class="login-input" type="password" id="admin-pwd" placeholder="Password" onkeydown="if(event.key==='Enter')adminLogin()"/>
+    <div class="login-err" id="login-err">Incorrect password</div>
+    <button class="btn-login" onclick="adminLogin()">Login</button>
+  </div>
+</div>
+
+<div class="admin-shell" id="admin-shell">
+  <div class="admin-header">
+    <div>
+      <div class="admin-title">&#9672; Rsbrm Admin</div>
+      <div class="admin-sub">Full visibility across all accounts</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" onclick="loadAll()">&#8635; Refresh</button>
+      <button class="btn btn-r" onclick="logout()">Logout</button>
+    </div>
+  </div>
+  <div class="admin-body">
+    <div class="account-grid" id="account-stats"></div>
+    <div class="card">
+      <div class="section-title">All Campaigns</div>
+      <div id="all-campaigns"><div style="font-size:12px;color:var(--muted);">Loading...</div></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Scheduled &amp; Active Blasts</div>
+      <div id="all-scheduled"><div style="font-size:12px;color:var(--muted);">Loading...</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const BACKEND = 'https://sms-blast-backend-production.up.railway.app';
+const ADMIN_KEY = 'rsbrm#7';
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3000);}
+
+function adminLogin() {
+  const pwd = document.getElementById('admin-pwd').value;
+  if (pwd === ADMIN_KEY) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-shell').style.display = 'block';
+    loadAll();
+  } else {
+    document.getElementById('login-err').style.display = 'block';
+    document.getElementById('admin-pwd').value = '';
+  }
+}
+
+function logout() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('admin-shell').style.display = 'none';
+  document.getElementById('admin-pwd').value = '';
+}
+
+async function loadAll() {
+  loadStats();
+  loadCampaigns();
+  loadScheduled();
+}
+
+async function loadStats() {
+  try {
+    const stats = await fetch(BACKEND + '/api/admin/stats?key=' + encodeURIComponent(ADMIN_KEY)).then(r=>r.json());
+    const accounts = [
+      { id: 'ezfinance', name: 'EZ Finance', url: 'rsbrm.co/ezfinance', color: 'var(--accent)' },
+      { id: 'wallstreetmedia', name: 'Wall Street Media', url: 'rsbrm.co/wallstreetmedia', color: 'var(--accent2)' }
+    ];
+    document.getElementById('account-stats').innerHTML = accounts.map(acct => {
+      const s = stats[acct.id] || {};
+      const rate = s.total > 0 ? Math.round((s.delivered/s.total)*100) : 0;
+      return `<div class="account-card" style="border-color:${acct.color}33;">
+        <div class="account-name" style="color:${acct.color};">${acct.name}</div>
+        <div class="account-url">${acct.url}</div>
+        <div class="stat-row">
+          <div class="stat-item"><div class="stat-val g">${(s.total||0).toLocaleString()}</div><div class="stat-lbl">Sent</div></div>
+          <div class="stat-item"><div class="stat-val b">${(s.delivered||0).toLocaleString()}</div><div class="stat-lbl">Delivered</div></div>
+          <div class="stat-item"><div class="stat-val r">${(s.failed||0).toLocaleString()}</div><div class="stat-lbl">Failed</div></div>
+          <div class="stat-item"><div class="stat-val y">${(s.inbound||0).toLocaleString()}</div><div class="stat-lbl">Replies</div></div>
+          <div class="stat-item"><div class="stat-val">${rate}%</div><div class="stat-lbl">Dlv Rate</div></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <a class="btn btn-g" href="/${acct.id}" target="_blank">Open &#8599;</a>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function loadCampaigns() {
+  try {
+    const camps = await fetch(BACKEND + '/api/admin/campaigns?key=' + encodeURIComponent(ADMIN_KEY)).then(r=>r.json());
+    const el = document.getElementById('all-campaigns');
+    if (!camps.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted);">No campaigns yet.</div>'; return; }
+    el.innerHTML = camps.map(c => `<div class="camp-row">
+      <div style="flex:1;">
+        <div style="font-weight:500;">${c.name||'Blast'}</div>
+        <div style="color:var(--muted);font-size:11px;font-family:var(--mono);">${(c.total||0).toLocaleString()} contacts / ${(c.sent||0).toLocaleString()} sent / ${(c.failed||0).toLocaleString()} failed / ${new Date(c.ts).toLocaleString('en-US',{timeZone:'America/New_York'})}</div>
+      </div>
+      <span style="font-size:10px;font-family:var(--mono);color:var(--accent2);padding:2px 8px;background:rgba(34,211,238,0.1);border-radius:20px;border:1px solid rgba(34,211,238,0.2);">${c.account_id||'ezfinance'}</span>
+      <span class="badge bs">Sent</span>
+    </div>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function loadScheduled() {
+  try {
+    const scheduled = await fetch(BACKEND + '/api/admin/scheduled?key=' + encodeURIComponent(ADMIN_KEY)).then(r=>r.json());
+    const el = document.getElementById('all-scheduled');
+    if (!scheduled.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted);">No scheduled blasts.</div>'; return; }
+    el.innerHTML = scheduled.map(s => {
+      const isFiring = s.status==='firing';
+      const isPending = s.status==='pending';
+      const badge = isFiring?'<span class="badge bi">Firing</span>':isPending?'<span class="badge bw">Scheduled</span>':s.status==='sent'?'<span class="badge bs">Sent</span>':`<span class="badge br">${s.status}</span>`;
+      const stopBtn = (isFiring||isPending)?`<button class="btn btn-r" style="font-size:11px;padding:3px 8px;" onclick="stopBlast(${s.id})">Stop</button>`:'';
+      return `<div class="camp-row">
+        <div style="flex:1;">
+          <div style="font-weight:500;">${s.name}</div>
+          <div style="color:var(--muted);font-size:11px;font-family:var(--mono);">${new Date(s.fire_at).toLocaleString('en-US',{timeZone:'America/New_York'})} EST / ${(s.sent||0).toLocaleString()} sent</div>
+        </div>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--accent2);padding:2px 8px;background:rgba(34,211,238,0.1);border-radius:20px;border:1px solid rgba(34,211,238,0.2);">${s.account_id||'ezfinance'}</span>
+        ${stopBtn}${badge}
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function stopBlast(id) {
+  if (!confirm('Stop this blast?')) return;
+  await fetch(BACKEND + '/api/admin/stop/' + id + '?key=' + encodeURIComponent(ADMIN_KEY), {method:'POST'});
+  toast('Stop signal sent');
+  setTimeout(loadScheduled, 2000);
+}
+
+// Auto refresh every 30s
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>
